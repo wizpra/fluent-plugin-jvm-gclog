@@ -17,5 +17,4 @@ Gem::Specification.new do |gem|
   gem.version       = "0.0.4"
   gem.add_development_dependency "rake"
   gem.add_runtime_dependency "fluentd"
-  gem.add_runtime_dependency "jvm_gclog", ">= 0.0.2"
 end
