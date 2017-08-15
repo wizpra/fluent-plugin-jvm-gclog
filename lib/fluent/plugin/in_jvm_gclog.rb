@@ -47,6 +47,12 @@ class JVMGCLogInput < TailInput
   end
 
   def receive_lines(lines, tail_watcher = nil)
+    if lines
+      lines.each do |line|
+        line.gsub!(/^.*message:/, '')
+      end
+    end
+
     es = parse_lines(lines)
     unless es.empty?
       tag = if @tag_prefix || @tag_suffix
