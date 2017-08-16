@@ -49,7 +49,7 @@ class JVMGCLogInput < TailInput
   def receive_lines(lines, tail_watcher = nil)
     if lines
       lines.each do |line|
-        line.gsub!(/^.*message:/, '')
+        line.gsub!(/^.*\t?message:/, '')
       end
     end
 
