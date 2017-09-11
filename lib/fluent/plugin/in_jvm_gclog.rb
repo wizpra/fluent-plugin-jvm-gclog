@@ -23,6 +23,7 @@ class JVMGCLogInput < TailInput
   def configure_parser(conf)
     @parser = JVMGCLog.new
     @hostname = `hostname -s`.strip
+    @container_id = ''
   end
 
   def parse_lines(lines)
@@ -33,6 +34,7 @@ class JVMGCLogInput < TailInput
       begin
         time = record.delete("time")
         record["host"] = @hostname
+        record["container_id"] = @container_id
         if time && record
           es.add(time, record)
         else
@@ -47,6 +49,16 @@ class JVMGCLogInput < TailInput
   end
 
   def receive_lines(lines, tail_watcher = nil)
+    if lines
+      lines.each_with_index do |line, i|
+        m = line.match(/^.*container_id:([0-9a-z]+)\t+message:(.+)/)
+        if m
+          @container_id = m[1]
+          lines[i] = m[2]
+        end
+      end
+    end
+
     es = parse_lines(lines)
     unless es.empty?
       tag = if @tag_prefix || @tag_suffix
