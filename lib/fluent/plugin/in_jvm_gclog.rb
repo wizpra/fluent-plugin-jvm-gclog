@@ -48,16 +48,12 @@ class JVMGCLogInput < TailInput
   end
 
   def receive_lines(lines, tail_watcher = nil)
-    containers = {}
+    containers = Hash.new {|h,k| h[k] = [] }
     if lines
       lines.each_with_index do |line, i|
         m = line.match(/^.*container_id:([0-9a-z]+)\tmessage:(.+)/)
         if m
-          if containers.has_key?(m[1])
-            containers[m[1]] << m[2]
-          else
-            containers[m[1]] = []
-          end
+          containers[m[1]] << m[2]
         end
       end
     end
