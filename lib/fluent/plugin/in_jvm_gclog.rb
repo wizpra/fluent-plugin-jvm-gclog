@@ -23,10 +23,9 @@ class JVMGCLogInput < TailInput
   def configure_parser(conf)
     @parser = JVMGCLog.new
     @hostname = `hostname -s`.strip
-    @container_id = ''
   end
 
-  def parse_lines(lines)
+  def parse_lines(container_id, lines)
     es = MultiEventStream.new
     chunks = @parser.recognize_chunks(lines)
     records = @parser.parse_chunks(chunks)
@@ -34,7 +33,7 @@ class JVMGCLogInput < TailInput
       begin
         time = record.delete("time")
         record["host"] = @hostname
-        record["container_id"] = @container_id
+        record["container_id"] = container_id
         if time && record
           es.add(time, record)
         else
@@ -49,31 +48,38 @@ class JVMGCLogInput < TailInput
   end
 
   def receive_lines(lines, tail_watcher = nil)
+    containers = {}
     if lines
       lines.each_with_index do |line, i|
         m = line.match(/^.*container_id:([0-9a-z]+)\tmessage:(.+)/)
         if m
-          @container_id = m[1]
-          lines[i] = m[2]
+          if containers.has_key?(m[1])
+            containers[m[1]] << m[2]
+          else
+            containers[m[1]] = []
+          end
         end
       end
     end
 
-    es = parse_lines(lines)
-    unless es.empty?
-      tag = if @tag_prefix || @tag_suffix
-              @tag_prefix + tail_watcher.tag + @tag_suffix
-            else
-              @tag
-            end
-      begin
-        if defined? router
-          router.emit_stream(tag, es)
-        else
-          Engine.emit_stream(tag, es)
+    containers.each do |container_id, lines|
+      es = parse_lines(container_id, lines)
+
+      unless es.empty?
+        tag = if @tag_prefix || @tag_suffix
+                @tag_prefix + tail_watcher.tag + @tag_suffix
+              else
+                @tag
+              end
+        begin
+          if defined? router
+            router.emit_stream(tag, es)
+          else
+            Engine.emit_stream(tag, es)
+          end
+        rescue
+          # ignore errors. Engine shows logs and backtraces.
         end
-      rescue
-        # ignore errors. Engine shows logs and backtraces.
       end
     end
   end
