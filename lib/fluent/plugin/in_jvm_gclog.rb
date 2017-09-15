@@ -51,7 +51,7 @@ class JVMGCLogInput < TailInput
   def receive_lines(lines, tail_watcher = nil)
     if lines
       lines.each_with_index do |line, i|
-        m = line.match(/^.*container_id:([0-9a-z]+)\t+message:(.+)/)
+        m = line.match(/^.*container_id:([0-9a-z]+)\tmessage:(.+)/)
         if m
           @container_id = m[1]
           lines[i] = m[2]
