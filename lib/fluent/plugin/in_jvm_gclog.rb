@@ -25,7 +25,7 @@ class JVMGCLogInput < TailInput
     @hostname = `hostname -s`.strip
   end
 
-  def parse_lines(lines)
+  def parse_lines(container_id, lines)
     es = MultiEventStream.new
     chunks = @parser.recognize_chunks(lines)
     records = @parser.parse_chunks(chunks)
@@ -33,6 +33,7 @@ class JVMGCLogInput < TailInput
       begin
         time = record.delete("time")
         record["host"] = @hostname
+        record["container_id"] = container_id
         if time && record
           es.add(time, record)
         else
@@ -47,21 +48,34 @@ class JVMGCLogInput < TailInput
   end
 
   def receive_lines(lines, tail_watcher = nil)
-    es = parse_lines(lines)
-    unless es.empty?
-      tag = if @tag_prefix || @tag_suffix
-              @tag_prefix + tail_watcher.tag + @tag_suffix
-            else
-              @tag
-            end
-      begin
-        if defined? router
-          router.emit_stream(tag, es)
-        else
-          Engine.emit_stream(tag, es)
+    containers = Hash.new {|h,k| h[k] = [] }
+    if lines
+      lines.each_with_index do |line, i|
+        m = line.match(/^.*container_id:([0-9a-z]+)\tmessage:(.+)/)
+        if m
+          containers[m[1]] << m[2]
         end
-      rescue
-        # ignore errors. Engine shows logs and backtraces.
+      end
+    end
+
+    containers.each do |container_id, lines|
+      es = parse_lines(container_id, lines)
+
+      unless es.empty?
+        tag = if @tag_prefix || @tag_suffix
+                @tag_prefix + tail_watcher.tag + @tag_suffix
+              else
+                @tag
+              end
+        begin
+          if defined? router
+            router.emit_stream(tag, es)
+          else
+            Engine.emit_stream(tag, es)
+          end
+        rescue
+          # ignore errors. Engine shows logs and backtraces.
+        end
       end
     end
   end
